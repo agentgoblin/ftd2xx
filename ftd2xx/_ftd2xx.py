@@ -35,10 +35,18 @@ else:
 _libraries = {}
 
 if sys.platform == 'win32':
-    if sys.maxsize > 2**32 and find_library('ftd2xx64'): # 64-bit
+    try:
         _libraries['ftd2xx.dll'] = WinDLL('ftd2xx64.dll')
-    else: # 32-bit, or 64-bit library with plain name
-        _libraries['ftd2xx.dll'] = WinDLL('ftd2xx.dll')
+    except OSError: # 32-bit, or 64-bit library with plain name
+        try:
+            _libraries['ftd2xx.dll'] = WinDLL('ftd2xx.dll')
+        except OSError as e:
+            if e.winerror == 126:
+                error_message = e.args[1] + 'Unable to find D2XX DLL. Please make sure ftd2xx.dll or ftd2xx64.dll is in the path.'
+                e.args = (e.args[0], error_message) + e.args[2:]
+                raise e
+            else:
+                raise
 else:
     _libraries['ftd2xx.dll'] = CDLL('libftd2xx.so')
 
@@ -81,6 +89,7 @@ INT = c_int
 LPTSTR = STRING
 LPDWORD = POINTER(DWORD)
 LPWORD = POINTER(WORD)
+LPLONG = POINTER(LONG)
 PULONG = POINTER(ULONG)
 LPVOID = PVOID
 VOID = None
@@ -871,6 +880,14 @@ FT_GetLibraryVersion.argtypes = [LPDWORD]
 FT_GetLibraryVersion.__doc__ = \
 """FT_STATUS FT_GetLibraryVersion(LPDWORD lpdwVersion)
 ftd2xx.h:870"""
+# ftd2xx.h 899
+FT_GetComPortNumber = _libraries['ftd2xx.dll'].FT_GetComPortNumber
+FT_GetComPortNumber.restype = FT_STATUS
+# FT_GetComPortNumber(ftHandle, lpdwComPortNumber)
+FT_GetComPortNumber.argtypes = [FT_HANDLE, LPLONG]
+FT_GetComPortNumber.__doc__ = \
+"""FT_STATUS FT_GetComPortNumber(FT_HANDLE ftHandle, LPLONG lpdwComPortNumber)
+ftd2xx.h:899"""
 __all__ = ['FT_DEVICE_232R', 'FT_STATUS', 'FT_GetLibraryVersion',
            'VOID', 'FT_GetLatencyTimer', 'FT_EE_ProgramEx',
            'FT_SetEventNotification', 'FT_GetDeviceInfoList',
@@ -922,4 +939,4 @@ __all__ = ['FT_DEVICE_232R', 'FT_STATUS', 'FT_GetLibraryVersion',
            'FT_W32_SetCommState', 'FT_INVALID_BAUD_RATE',
            'FT_SetWaitMask', 'FT_EE_UASize', 'FT_DEVICE_UNKNOWN',
            'FT_DEVICE', 'FT_OTHER_ERROR', 'ft_program_data', 'PVOID',
-           'FT_W32_SetCommMask']
+           'FT_W32_SetCommMask', 'LPLONG', 'FT_GetComPortNumber']
